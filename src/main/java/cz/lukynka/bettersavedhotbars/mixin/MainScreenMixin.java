@@ -1,5 +1,6 @@
 package cz.lukynka.bettersavedhotbars.mixin;
 
+import com.mojang.blaze3d.Blaze3D;
 import cz.lukynka.bettersavedhotbars.BetterSavedHotbars;
 import net.minecraft.client.gui.components.PlainTextButton;
 import net.minecraft.client.gui.screens.Screen;
@@ -11,6 +12,8 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.net.URI;
 
 @Mixin(TitleScreen.class)
 public abstract class MainScreenMixin extends Screen {
@@ -56,9 +59,8 @@ public abstract class MainScreenMixin extends Screen {
                 this.font.width(component),
                 10,
                 component,
-                (clickable) -> Util.getPlatform().openUri("https://modrinth.com/mod/better-saved-hotbars/version/" + BetterSavedHotbars.UPDATE_TAG),
+                (clickable) -> Blaze3D.openUri(URI.create("https://modrinth.com/mod/better-saved-hotbars-forked/version/" + BetterSavedHotbars.UPDATE_TAG)),
                 this.font);
-
         this.addRenderableWidget(button);
     }
 
