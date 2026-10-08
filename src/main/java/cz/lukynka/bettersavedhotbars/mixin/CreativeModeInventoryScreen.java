@@ -1,6 +1,5 @@
 package cz.lukynka.bettersavedhotbars.mixin;
 
-import cz.lukynka.bettersavedhotbars.BetterSavedHotbars;
 import cz.lukynka.bettersavedhotbars.HotbarInfo;
 import net.minecraft.client.HotbarManager;
 import net.minecraft.client.Minecraft;
@@ -27,52 +26,77 @@ public abstract class CreativeModeInventoryScreen {
     @Shadow private static CreativeModeTab selectedTab;
     @Shadow private float scrollOffs;
 
+    @Unique private static final int LEFT_CLICK = 0;
+    @Unique private static final int RIGHT_CLICK = 1;
+    @Unique private static final int MIDDLE_CLICK = 2;
+
     @Shadow protected abstract void selectTab(CreativeModeTab creativeModeTab);
 
     @Inject(at = @At("HEAD"), method = "slotClicked", cancellable = true)
-    private void slotClicked(@Nullable Slot slot, int i, int j, ContainerInput containerInput, CallbackInfo ci) {
+    private void slotClicked(@Nullable Slot slot, int slotId, int buttonNum, ContainerInput containerInput, CallbackInfo ci) {
         if (selectedTab.getType() != CreativeModeTab.Type.HOTBAR) return;
 
-        if (slot == null) return;
-
-        HotbarManager hotbarManager = Minecraft.getInstance().getHotbarManager();
         Player player = Minecraft.getInstance().player;
         assert player != null;
-        ItemStack item = player.inventoryMenu.getCarried().copy();
-        RegistryAccess registryAccess = player.level().registryAccess();
 
-        if (i >= 45) return;
-        HotbarInfo newHotbarInfo = getHotbarWithIndex(slot);
-
-        if (item.getItem() == Items.AIR) {
-            if (containerInput == ContainerInput.CLONE) {
-                ItemStack slotItem = slot.getItem();
-                slot.set(new ItemStack(Items.AIR, 0));
-                var hotbar = hotbarManager.get(newHotbarInfo.row());
-                hotbar.storeFrom(fakeInventoryWithModifiedHotbar(hotbar.load(registryAccess), newHotbarInfo.slot(), item), registryAccess);
-                hotbarManager.save();
-                Minecraft.getInstance().player.inventoryMenu.setCarried(slotItem);
-                ci.cancel();
+        if (slot == null) {
+            if (buttonNum == MIDDLE_CLICK) {
+                player.inventoryMenu.setCarried(ItemStack.EMPTY);
             }
             return;
         }
 
-        if (!slot.getItem().isEmpty()) {
-            player.inventoryMenu.setCarried(ItemStack.EMPTY);
+        ItemStack carriedItem = player.inventoryMenu.getCarried();
+
+        if (slotId >= 45) return;
+
+        if (carriedItem.getItem() == Items.AIR) {
+            // If user isn't carrying anything and used the right-click button, then remove the item from the saved hotbar and put it in his hand.
+            if (buttonNum == RIGHT_CLICK) {
+                this.swapCarriedItemWithSavedHotbarSlot(slot, player, ci);
+            }
+            // If user used a different button, fallback to the default creative inventory logic handling for that button.
             return;
         }
-        
-        slot.set(item);
-        var hotbar = hotbarManager.get(newHotbarInfo.row());
-        hotbar.storeFrom(fakeInventoryWithModifiedHotbar(hotbar.load(registryAccess), newHotbarInfo.slot(), item), registryAccess);
+        // If we reach this point, player is carrying something
 
-        hotbarManager.save();
-        Minecraft.getInstance().player.inventoryMenu.setCarried(ItemStack.EMPTY);
-        BetterSavedHotbars.LAST_SCROLL_OFFSET = scrollOffs;
-        this.selectTab(selectedTab);
-        ci.cancel();
+        if (buttonNum == MIDDLE_CLICK) {
+            // If the user is holding something and uses middle click -> Clear what he is holding
+            player.inventoryMenu.setCarried(ItemStack.EMPTY);
+            return; // And fall back to the default action, which is to take a full stack of the highlighted item
+            // This results in middle click always taking a full stack of what is highlighted, or clearing itself if cell is empty
+        }
+
+        if (slot.getItem().isEmpty()) {
+            // Put the item carried by the player into the hotbar slot
+            this.swapCarriedItemWithSavedHotbarSlot(slot, player, ci);
+        } else {
+            if (buttonNum == RIGHT_CLICK) {
+                // If player right clicks, swap item held with item in slot
+                this.swapCarriedItemWithSavedHotbarSlot(slot, player, ci);
+            } else if (buttonNum == LEFT_CLICK) {
+                // If player left clicks, and there is an item in the slot, clear his hand and default to picking a copy of the stack
+                player.inventoryMenu.setCarried(ItemStack.EMPTY);
+            }
+        }
     }
 
+    @Unique
+    private void swapCarriedItemWithSavedHotbarSlot(Slot slot, Player player, CallbackInfo ci) {
+        RegistryAccess registryAccess = player.level().registryAccess();
+        HotbarManager hotbarManager = Minecraft.getInstance().getHotbarManager();
+        HotbarInfo newHotbarInfo = getHotbarWithIndex(slot);
+        ItemStack slotItem = slot.getItem();
+        ItemStack carriedItem = player.inventoryMenu.getCarried().copy();
+
+        slot.set(carriedItem);
+        var hotbar = hotbarManager.get(newHotbarInfo.row());
+        hotbar.storeFrom(fakeInventoryWithModifiedHotbar(hotbar.load(registryAccess), newHotbarInfo.slot(), carriedItem), registryAccess);
+        hotbarManager.save();
+
+        player.inventoryMenu.setCarried(slotItem);
+        ci.cancel(); // Cancel so that default logic isn't run
+    }
 
     @Unique
     private Inventory fakeInventoryWithModifiedHotbar(List<ItemStack> existingItems, Integer slot, ItemStack itemStack) {

@@ -33,7 +33,7 @@ public abstract class SelectTabMixin extends AbstractContainerScreen<CreativeMod
 
     @Inject(at = @At("TAIL"), method = "selectTab", cancellable = true)
     private void selectTab(CreativeModeTab creativeModeTab, CallbackInfo ci) {
-        if (selectedTab.getType() == CreativeModeTab.Type.HOTBAR && selectedTab.getIconItem().getItem() == Items.BOOKSHELF) {
+        if (selectedTab.getType() == CreativeModeTab.Type.HOTBAR) {
             HotbarManager hotbarManager = Minecraft.getInstance().getHotbarManager();
             RegistryAccess registryAccess = Minecraft.getInstance().player.level().registryAccess();
             (this.menu).items.clear();
@@ -61,4 +61,3 @@ public abstract class SelectTabMixin extends AbstractContainerScreen<CreativeMod
         }
     }
 }
-
